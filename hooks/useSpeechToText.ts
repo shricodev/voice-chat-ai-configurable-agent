@@ -77,12 +77,14 @@ export const useSpeechToText = (
         recognitionRef.current.maxAlternatives = maxAlternatives;
 
         recognitionRef.current.onstart = () => {
+          console.log("Speech recognition started"); // Add logging
           setIsListening(true);
           setError(null);
           onStart?.();
         };
 
         recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
+          console.log("Speech recognition result:", event); // Add logging
           let finalTranscript = "";
           let interimText = "";
           let lastConfidence: number | null = null;
@@ -110,24 +112,20 @@ export const useSpeechToText = (
         recognitionRef.current.onerror = (
           event: SpeechRecognitionErrorEvent,
         ) => {
+          console.error("Speech recognition error:", event.error); // Add logging
           setError(event.error);
           setIsListening(false);
           onError?.(event.error);
         };
 
         recognitionRef.current.onend = () => {
+          console.log("Speech recognition ended"); // Add logging
           setIsListening(false);
           setInterimTranscript("");
           onEnd?.();
         };
       }
     }
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
   }, [
     continuous,
     interimResults,
@@ -138,14 +136,22 @@ export const useSpeechToText = (
     onEnd,
   ]);
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     if (!isSupported.current) {
       setError("Speech recognition is not supported in this browser");
       return;
     }
 
     if (recognitionRef.current && !isListening) {
-      // setTranscript("");
+      // Request microphone permission first
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        setError("Microphone permission denied");
+        return;
+      }
+
+      setTranscript(""); // Clear previous transcript
       setError(null);
       setInterimTranscript("");
 

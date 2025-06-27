@@ -23,8 +23,8 @@ interface Message {
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [inputValue, setInputValue] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const { aliases } = useAliasStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -89,8 +89,8 @@ export function ChatInterface() {
       };
 
       setMessages((prev) => [...prev, botMessage]);
-      // await playAudio(result.content);
-      await playAudio("Hello, this is Shrijal Acharya, how can I help you?");
+      await playAudio(result.content);
+      // await playAudio("Hello, this is Shrijal Acharya, how can I help you?");
     } catch (err) {
       console.error("Error generating response:", err);
       const errorMessage: Message = {
@@ -99,15 +99,25 @@ export function ChatInterface() {
         content: "Error generating response",
       };
       setMessages((prev) => [...prev, errorMessage]);
-      // await playAudio(errorMessage.content);
-      await playAudio("Hello, this is Shrijal Acharya, how can I help you?");
+      await playAudio(errorMessage.content);
+      // await playAudio("Hello, this is Shrijal Acharya, how can I help you?");
     } finally {
       setIsLoading(false);
     }
   };
 
   const { isListening, transcript, startListening, stopListening } =
-    useSpeechToText();
+    useSpeechToText({
+      onEnd: () => {
+        // Auto-submit when speech recognition ends
+        if (transcript.trim()) {
+          handleProcessMessage(transcript);
+        }
+      },
+      onError: (error) => {
+        console.error("Speech recognition error:", error);
+      },
+    });
 
   useEffect(() => {
     if (transcript) setInputValue(transcript);

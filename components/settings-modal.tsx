@@ -54,7 +54,6 @@ export function SettingsModal() {
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Only show if there are active integrations */}
           {activeIntegrations.length > 0 && (
             <div className="space-y-4">
               <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
@@ -111,7 +110,6 @@ export function SettingsModal() {
 
           {activeIntegrations.length > 0 && <Separator />}
 
-          {/* Add New Parameter Section */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
               Add New Parameter
