@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { CONFIG } from "@/lib/constants";
+import { handleApiError, logError } from "@/lib/error-handler";
+
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+if (!OPENAI_API_KEY) {
+  throw new Error("OPENAI_API_KEY environment variable is not set");
+}
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: OPENAI_API_KEY,
 });
 
 export async function POST(req: NextRequest) {
@@ -11,8 +19,8 @@ export async function POST(req: NextRequest) {
     if (!text) return new NextResponse("Text is required", { status: 400 });
 
     const mp3 = await openai.audio.speech.create({
-      model: "tts-1",
-      voice: "echo",
+      model: CONFIG.TTS_MODEL,
+      voice: CONFIG.TTS_VOICE,
       input: text,
     });
 
@@ -22,8 +30,11 @@ export async function POST(req: NextRequest) {
         "content-type": "audio/mpeg",
       },
     });
-  } catch (err) {
-    console.error("Error generating response audio:", err);
-    return new NextResponse("Error generating response audio", { status: 500 });
+  } catch (error) {
+    logError(error, "API /tts");
+    const { statusCode } = handleApiError(error);
+    return new NextResponse("Error generating response audio", {
+      status: statusCode,
+    });
   }
 }

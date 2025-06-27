@@ -15,14 +15,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useAliasStore } from "@/lib/alias-store";
-import { Settings, Plus, Trash2 } from "lucide-react";
+import { Settings, Plus, Trash2, Edit, Check, X } from "lucide-react";
 import { useState } from "react";
 
 export function SettingsModal() {
-  const { aliases, addAlias, removeAlias } = useAliasStore();
-  const [newIntegration, setNewIntegration] = useState("");
-  const [newName, setNewName] = useState("");
-  const [newValue, setNewValue] = useState("");
+  const { aliases, addAlias, removeAlias, editAlias } = useAliasStore();
+
+  const [newIntegration, setNewIntegration] = useState<string>("");
+  const [newName, setNewName] = useState<string>("");
+  const [newValue, setNewValue] = useState<string>("");
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editName, setEditName] = useState<string>("");
+  const [editValue, setEditValue] = useState<string>("");
 
   const handleAddAlias = () => {
     if (!newIntegration.trim() || !newName.trim() || !newValue.trim()) return;
@@ -30,6 +34,30 @@ export function SettingsModal() {
     setNewIntegration("");
     setNewName("");
     setNewValue("");
+  };
+
+  const handleEditStart = (
+    integration: string,
+    alias: { name: string; value: string },
+  ) => {
+    const editKey = `${integration}:${alias.name}`;
+    setEditingKey(editKey);
+    setEditName(alias.name);
+    setEditValue(alias.value);
+  };
+
+  const handleEditSave = (integration: string, oldName: string) => {
+    if (!editName.trim() || !editValue.trim()) return;
+    editAlias(integration, oldName, { name: editName, value: editValue });
+    setEditingKey(null);
+    setEditName("");
+    setEditValue("");
+  };
+
+  const handleEditCancel = () => {
+    setEditingKey(null);
+    setEditName("");
+    setEditValue("");
   };
 
   const activeIntegrations = Object.entries(aliases).filter(
@@ -66,42 +94,105 @@ export function SettingsModal() {
                     <h4 className="font-medium capitalize">{integration}</h4>
                   </div>
                   <div className="space-y-2 pl-4">
-                    {aliasList.map((alias) => (
-                      <div
-                        key={alias.name}
-                        className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30"
-                      >
-                        <div className="flex-1 grid grid-cols-2 gap-3">
-                          <div>
-                            <Label className="text-xs text-muted-foreground">
-                              Alias Name
-                            </Label>
-                            <div className="font-mono text-sm mt-1">
-                              {alias.name}
+                    {aliasList.map((alias) => {
+                      const editKey = `${integration}:${alias.name}`;
+                      const isEditing = editingKey === editKey;
+
+                      return (
+                        <div
+                          key={alias.name}
+                          className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30"
+                        >
+                          <div className="flex-1 grid grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs text-muted-foreground">
+                                Alias Name
+                              </Label>
+                              {isEditing ? (
+                                <Input
+                                  value={editName}
+                                  onChange={(e) => setEditName(e.target.value)}
+                                  className="font-mono text-sm mt-1 h-8"
+                                />
+                              ) : (
+                                <div className="font-mono text-sm mt-1">
+                                  {alias.name}
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground">
+                                Value
+                              </Label>
+                              {isEditing ? (
+                                <Input
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  className="font-mono text-sm mt-1 h-8"
+                                />
+                              ) : (
+                                <div
+                                  className="font-mono text-sm mt-1 truncate"
+                                  title={alias.value}
+                                >
+                                  {alias.value}
+                                </div>
+                              )}
                             </div>
                           </div>
-                          <div>
-                            <Label className="text-xs text-muted-foreground">
-                              Value
-                            </Label>
-                            <div
-                              className="font-mono text-sm mt-1 truncate"
-                              title={alias.value}
-                            >
-                              {alias.value}
-                            </div>
+                          <div className="flex gap-1">
+                            {isEditing ? (
+                              <>
+                                <Button
+                                  variant="default"
+                                  size="icon"
+                                  className="size-8"
+                                  onClick={() =>
+                                    handleEditSave(integration, alias.name)
+                                  }
+                                  disabled={
+                                    !editName.trim() || !editValue.trim()
+                                  }
+                                >
+                                  <Check className="size-3" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="size-8"
+                                  onClick={handleEditCancel}
+                                >
+                                  <X className="size-3" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="size-8"
+                                  onClick={() =>
+                                    handleEditStart(integration, alias)
+                                  }
+                                >
+                                  <Edit className="size-3" />
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  className="size-8"
+                                  onClick={() =>
+                                    removeAlias(integration, alias.name)
+                                  }
+                                >
+                                  <Trash2 className="size-3" />
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </div>
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          className="size-8"
-                          onClick={() => removeAlias(integration, alias.name)}
-                        >
-                          <Trash2 className="size-3" />
-                        </Button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}

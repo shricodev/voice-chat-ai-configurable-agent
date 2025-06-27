@@ -12,13 +12,26 @@ import { ChatOpenAI } from "@langchain/openai";
 import { messageSchema } from "@/lib/validators/message";
 import { ChatCompletionMessageToolCall } from "openai/resources/chat/completions.mjs";
 import { v4 as uuidv4 } from "uuid";
+import { CONFIG, SYSTEM_MESSAGES } from "@/lib/constants";
+import { handleApiError, logError } from "@/lib/error-handler";
+
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const COMPOSIO_API_KEY = process.env.COMPOSIO_API_KEY;
+
+if (!OPENAI_API_KEY) {
+  throw new Error("OPENAI_API_KEY environment variable is not set");
+}
+
+if (!COMPOSIO_API_KEY) {
+  throw new Error("COMPOSIO_API_KEY environment variable is not set");
+}
 
 const llm = new ChatOpenAI({
-  model: "gpt-4o-mini",
-  apiKey: process.env.OPENAI_API_KEY,
+  model: CONFIG.OPENAI_MODEL,
+  apiKey: OPENAI_API_KEY,
   temperature: 0,
 });
-const toolset = new OpenAIToolSet({ apiKey: process.env.COMPOSIO_API_KEY });
+const toolset = new OpenAIToolSet({ apiKey: COMPOSIO_API_KEY });
 
 export async function POST(req: NextRequest) {
   try {
@@ -99,12 +112,11 @@ parameters (like a channel ID or URL) in the settings.`,
     );
     return NextResponse.json({ content: finalResponse });
   } catch (error) {
-    console.error("Error in /api/chat:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "An unexpected error occurred.";
+    logError(error, "API /chat");
+    const { message, statusCode } = handleApiError(error);
     return NextResponse.json(
-      { content: `Sorry, I encountered an error: ${errorMessage}` },
-      { status: 500 },
+      { content: `Sorry, I encountered an error: ${message}` },
+      { status: statusCode },
     );
   }
 }
@@ -119,13 +131,7 @@ async function checkToolUseIntent(message: string): Promise<boolean> {
   const structuredLlm = llm.withStructuredOutput(intentSchema);
 
   const result = await structuredLlm.invoke([
-    new SystemMessage(`You are an intent classification expert. Your job is to
-determine if a user's request requires executing an action with a tool (like
-sending an email, fetching data, creating a task) or if it's a general
-conversational question (like 'hello', 'what is the capital of France?').
-    
-    - If it's an action, classify as 'TOOL_USE'.
-    - If it's a general question or greeting, classify as 'GENERAL_CHAT'.`),
+    new SystemMessage(SYSTEM_MESSAGES.INTENT_CLASSIFICATION),
     new HumanMessage(message),
   ]);
 
@@ -146,11 +152,7 @@ message, from the available apps list.`,
   );
 
   const result = await structuredLlm.invoke([
-    new SystemMessage(`You are an expert at identifying which software
-applications a user wants to interact with. Given a list of available
-applications, determine which ones are relevant to the user's request.
-
-        Available applications: ${availableApps.join(", ")}`),
+    new SystemMessage(SYSTEM_MESSAGES.APP_IDENTIFICATION(availableApps)),
     new HumanMessage(message),
   ]);
 
@@ -176,12 +178,7 @@ related to the user's message.`,
 
   try {
     const result = await structuredLlm.invoke([
-      new SystemMessage(`You are a smart assistant that identifies relevant
-parameters. Based on the user's message, identify which of the available
-aliases are being referred to. Only return the names of the aliases that are
-relevant.
-
-Available alias names: ${aliasNames.join(", ")}`),
+      new SystemMessage(SYSTEM_MESSAGES.ALIAS_MATCHING(aliasNames)),
       new HumanMessage(message),
     ]);
 
@@ -213,17 +210,11 @@ check your Composio connections.`;
   console.log(`Fetched ${tools.length} tools from Composio.`);
 
   const conversationHistory: BaseMessage[] = [
-    new SystemMessage(
-      `You are a powerful and helpful AI assistant. Your goal is to use the
-provided tools to fulfill the user's request completely. You can use multiple
-tools in sequence if needed. Once you have finished, provide a clear, concise
-summary of what you accomplished.`,
-    ),
+    new SystemMessage(SYSTEM_MESSAGES.TOOL_EXECUTION),
     new HumanMessage(contextualizedMessage),
   ];
 
-  // let totalToolsUsed = 0;
-  const maxIterations = 10;
+  const maxIterations = CONFIG.MAX_TOOL_ITERATIONS;
 
   for (let i = 0; i < maxIterations; i++) {
     console.log(`Iteration ${i + 1}: Calling LLM with ${tools.length} tools.`);
@@ -272,12 +263,7 @@ summary of what you accomplished.`,
 
   console.log("Generating final summary...");
   const summaryResponse = await llm.invoke([
-    new SystemMessage(
-      `You are a helpful assistant. Your task is to create a brief, friendly,
-and conversational summary of the actions that were just completed for the
-user. Focus on what was accomplished. Start with a friendly confirmation like
-'All set!', 'Done!', or 'Okay!'.`,
-    ),
+    new SystemMessage(SYSTEM_MESSAGES.SUMMARY_GENERATION),
     new HumanMessage(
       `Based on this conversation history, provide a summary of what was done.
 The user's original request is in the first HumanMessage.\n\nConversation

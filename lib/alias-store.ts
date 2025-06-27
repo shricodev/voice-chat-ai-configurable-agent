@@ -14,6 +14,11 @@ interface AliasState {
   aliases: IntegrationAliases;
   addAlias: (integration: string, alias: Alias) => void;
   removeAlias: (integration: string, aliasName: string) => void;
+  editAlias: (
+    integration: string,
+    oldAliasName: string,
+    newAlias: Alias,
+  ) => void;
 }
 
 export const useAliasStore = create<AliasState>()(
@@ -33,6 +38,15 @@ export const useAliasStore = create<AliasState>()(
             ...state.aliases,
             [integration]: state.aliases[integration].filter(
               (a) => a.name !== aliasName,
+            ),
+          },
+        })),
+      editAlias: (integration, oldAliasName, newAlias) =>
+        set((state) => ({
+          aliases: {
+            ...state.aliases,
+            [integration]: state.aliases[integration].map((a) =>
+              a.name === oldAliasName ? newAlias : a,
             ),
           },
         })),
