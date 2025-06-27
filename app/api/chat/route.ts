@@ -201,7 +201,7 @@ async function executeToolCallingLogic(
   );
 
   const tools = await toolset.getTools({ apps: [...composioAppNames] });
-  if (tools.length === 0) {
+  if (!tools || tools.length === 0) {
     console.warn("No tools found from Composio for the specified apps.");
     return `I couldn't find any actions for ${targetApps.join(" and ")}. Please
 check your Composio connections.`;
